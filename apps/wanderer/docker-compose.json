@@ -1,0 +1,84 @@
+{
+  "services": [
+    {
+      "name": "wanderer-search",
+      "image": "flomp/wanderer-search",
+      "internalPort": 7700,
+      "isMain": false,
+      "environment": {
+        "MEILI_URL": "http://wanderer-search:7700",
+        "MEILI_MASTER_KEY": "${MEILI_MASTER_KEY}",
+        "MEILI_NO_ANALYTICS": true
+      },
+      "volumes": [
+        {
+          "hostPath": "${APP_DATA_DIR}/data/search/data.ms",
+          "containerPath": "/meili_data/data.ms",
+          "readOnly": false
+        }
+      ],
+      "healthCheck": {
+        "test": "curl --fail http://localhost:7700/health || exit 1",
+        "retries": 10,
+        "interval": "15s",
+        "timeout": "30s",
+        "start_period": "20s"
+      }
+    },
+    {
+      "name": "wanderer-db",
+      "image": "flomp/wanderer-db",
+      "internalPort": 8090,
+      "isMain": false,
+      "dependsOn": {
+        "wanderer-search": {
+          "condition": "service_healthy"
+        }
+      },
+      "environment": {
+        "MEILI_URL": "http://wanderer-search:7700",
+        "MEILI_MASTER_KEY": "${MEILI_MASTER_KEY}"
+      },
+      "volumes": [
+        {
+          "hostPath": "${APP_DATA_DIR}/data/database/pb_data",
+          "containerPath": "/pb_data",
+          "readOnly": false
+        }
+      ]
+    },
+    {
+      "name": "wanderer",
+      "image": "flomp/wanderer-web",
+      "internalPort": 3000,
+      "isMain": true,
+      "dependsOn": {
+        "wanderer-search": {
+          "condition": "service_healthy"
+        },
+        "wanderer-db": {
+          "condition": "service_started"
+        }
+      },
+      "environment": {
+        "MEILI_URL": "http://wanderer-search:7700",
+        "MEILI_MASTER_KEY": "${MEILI_MASTER_KEY}",
+        "ORIGIN": "http://${APP_DOMAIN}",
+        "BODY_SIZE_LIMIT": "100MB",
+        "PUBLIC_POCKETBASE_URL": "http://wanderer-db:8090",
+        "PUBLIC_DISABLE_SIGNUP": "${PUBLIC_SIGNUP}",
+        "UPLOAD_FOLDER": "/app/uploads",
+        "UPLOAD_USER": "",
+        "UPLOAD_PASSWORD": "",
+        "PUBLIC_VALHALLA_URL": "https://valhalla1.openstreetmap.de"
+      },
+      "volumes": [
+        {
+          "hostPath": "${APP_DATA_DIR}/data/uploads",
+          "containerPath": "/app/uploads",
+          "readOnly": false
+        }
+      ]
+    }
+  ]
+}
